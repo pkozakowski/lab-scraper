@@ -3,6 +3,7 @@ import asyncio
 import csv
 
 import data
+import scraping
 import streams
 
 
@@ -15,13 +16,27 @@ subscriptions = [
 ]
 
 
-async def stream_all_papers(limit):
+async def postprocess_paper(paper):
+    if paper.url is not None and scraping.is_arxiv_url(paper.url):
+        n_citations = await scraping.arxiv_fetch_citations(paper.url)
+        paper = paper._replace(n_citations=n_citations)
+    return paper
+
+
+async def stream_all_papers(limit, buffer_size=30):
     count = 0
+    tasks = []
     for stream in subscriptions:
         async for paper in stream():
+            if count == limit or len(tasks) == buffer_size:
+                for task in tasks:
+                    yield await task
+                tasks.clear()
+
             if count == limit:
                 return
-            yield paper
+
+            tasks.append(asyncio.create_task(postprocess_paper(paper)))
             count += 1
 
 

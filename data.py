@@ -1,4 +1,6 @@
 import collections
 
 
-Paper = collections.namedtuple("Paper", ["title", "year", "n_citations", "url"])
+Paper = collections.namedtuple(
+    "Paper", ["title", "year", "url", "n_citations"], defaults=(None,)
+)

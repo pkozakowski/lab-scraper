@@ -46,12 +46,12 @@ class Arxiv(PaperStream):
             html = await scraping.fetch_static_page(url)
             feed = feedparser.parse(html)
 
-            tasks = [
-                asyncio.create_task(self._fetch_paper(entry))
-                for entry in feed.entries
-            ]
-            for task in tasks:
-                yield await task
+            for entry in feed.entries:
+                yield data.Paper(
+                    title=entry.title,
+                    year=entry.updated_parsed.tm_year,
+                    url=entry.link,
+                )
 
             page += 1
             n_pages = (
@@ -59,15 +59,6 @@ class Arxiv(PaperStream):
                 // int(feed.feed.opensearch_itemsperpage)
                 + 1
             )
-
-    async def _fetch_paper(self, entry):
-        n_citations = await scraping.arxiv_fetch_citations(entry.link)
-        return data.Paper(
-            title=entry.title,
-            year=entry.updated_parsed.tm_year,
-            n_citations=n_citations,
-            url=entry.link,
-        )
 
 
 class DeepMind(PaperStream):
@@ -119,13 +110,5 @@ class DeepMind(PaperStream):
             if "arxiv" in link["href"]:
                 arxiv_url = scraping.arxiv_abs_url(link["href"])
 
-        if arxiv_url is not None:
-            year = scraping.arxiv_year(arxiv_url)
-            n_citations = await scraping.arxiv_fetch_citations(arxiv_url)
-        else:
-            year = None
-            n_citations = None
-
-        return data.Paper(
-            title=title, year=year, url=arxiv_url, n_citations=n_citations
-        )
+        year = scraping.arxiv_year(arxiv_url) if arxiv_url is not None else None
+        return data.Paper(title=title, year=year, url=arxiv_url)

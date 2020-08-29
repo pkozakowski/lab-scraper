@@ -22,6 +22,10 @@ async def fetch_dynamic_page(url, load_time=3):
     return html
 
 
+def is_arxiv_url(url):
+    return "arxiv" in url
+
+
 def arxiv_abs_url(url):
     if "abs" not in url:
         assert "pdf" in url, url
