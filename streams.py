@@ -1,6 +1,7 @@
 import asyncio
 
 import bs4
+import feedparser
 
 import data
 import scraping
@@ -10,6 +11,63 @@ class PaperStream:
     async def __call__(self):
         """Generates a stream of Papers."""
         raise NotImplementedError
+
+
+class Arxiv(PaperStream):
+
+    api_url_template = (
+        "http://export.arxiv.org/api/query?sortBy=lastUpdatedDate&sortOrder=ascending&"
+        "search_query={query}&start={start}&max_results={limit}"
+    )
+    page_limit = 100
+
+    def __init__(self, categories=(), abstract_contains=()):
+        def clause(op, xs):
+            return "(" + ("+" + op + "+").join(xs) + ")"
+
+        def query_clause(prefix, xs):
+            return clause("OR", [prefix + ':"' + x + '"' for x in xs])
+
+        query_elems = []
+        if categories:
+            query_elems.append(query_clause("cat", categories))
+        if abstract_contains:
+            query_elems.append(query_clause("abs", abstract_contains))
+
+        self._query = clause("AND", query_elems)
+
+    async def __call__(self):
+        page = 0
+        n_pages = None
+        while page == 0 or page < n_pages:
+            url = self.api_url_template.format(
+                query=self._query, start=(page * self.page_limit), limit=self.page_limit
+            )
+            html = await scraping.fetch_static_page(url)
+            feed = feedparser.parse(html)
+
+            tasks = [
+                asyncio.create_task(self._fetch_paper(entry))
+                for entry in feed.entries
+            ]
+            for task in tasks:
+                yield await task
+
+            page += 1
+            n_pages = (
+                int(feed.feed.opensearch_totalresults)
+                // int(feed.feed.opensearch_itemsperpage)
+                + 1
+            )
+
+    async def _fetch_paper(self, entry):
+        n_citations = await scraping.arxiv_fetch_citations(entry.link)
+        return data.Paper(
+            title=entry.title,
+            year=entry.updated_parsed.tm_year,
+            n_citations=n_citations,
+            url=entry.link,
+        )
 
 
 class DeepMind(PaperStream):
@@ -61,17 +119,12 @@ class DeepMind(PaperStream):
             if "arxiv" in link["href"]:
                 arxiv_url = scraping.arxiv_abs_url(link["href"])
 
-        year = None
-        n_citations = None
         if arxiv_url is not None:
             year = scraping.arxiv_year(arxiv_url)
-            ss_url = scraping.arxiv_to_semanticscholar(arxiv_url)
-            ss_html = await scraping.fetch_static_page(ss_url)
-            ss_soup = bs4.BeautifulSoup(ss_html, "html.parser")
-            citation_list_label = ss_soup.find("div", {"class": "citation-list__label"})
-            if citation_list_label is not None:
-                citation_text = citation_list_label.text
-                n_citations = scraping.semanticscholar_parse_citations(citation_text)
+            n_citations = await scraping.arxiv_fetch_citations(arxiv_url)
+        else:
+            year = None
+            n_citations = None
 
         return data.Paper(
             title=title, year=year, url=arxiv_url, n_citations=n_citations

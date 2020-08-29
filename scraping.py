@@ -1,6 +1,7 @@
 import asyncio
 
 import aiohttp
+import bs4
 from selenium import webdriver
 
 
@@ -52,3 +53,15 @@ def arxiv_to_semanticscholar(abs_url):
 def semanticscholar_parse_citations(citation_text):
     # Pattern: SHOWING 1-N OF N CITATIONS
     return int(citation_text.split(" ")[3].replace(",", ""))
+
+
+async def arxiv_fetch_citations(abs_url):
+    ss_url = arxiv_to_semanticscholar(abs_url)
+    ss_html = await fetch_static_page(ss_url)
+    ss_soup = bs4.BeautifulSoup(ss_html, "html.parser")
+    citation_list_label = ss_soup.find("div", {"class": "citation-list__label"})
+    if citation_list_label is not None:
+        citation_text = citation_list_label.text
+        return semanticscholar_parse_citations(citation_text)
+    else:
+        return None
