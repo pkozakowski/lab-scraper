@@ -16,10 +16,17 @@ subscriptions = [
 ]
 
 
+def escape_id(id):
+    return id.replace('/', '_')
+
+
 async def postprocess_paper(paper):
     if paper.url is not None and scraping.is_arxiv_url(paper.url):
         n_citations = await scraping.arxiv_fetch_citations(paper.url)
-        paper = paper._replace(n_citations=n_citations)
+        paper = paper._replace(
+            n_citations=n_citations,
+            id=escape_id(scraping.arxiv_pub_id(paper.url)),
+        )
     return paper
 
 
