@@ -17,20 +17,24 @@ subscriptions = [
 
 
 def escape_id(id):
-    return id.replace('/', '_')
+    return id.replace("/", "_")
 
 
-async def postprocess_paper(paper):
+async def postprocess_paper(paper, citations):
     if paper.url is not None and scraping.is_arxiv_url(paper.url):
-        n_citations = await scraping.arxiv_fetch_citations(paper.url)
+        if citations:
+            n_citations = await scraping.arxiv_fetch_citations(paper.url)
+        else:
+            n_citations = None
+
         paper = paper._replace(
-            n_citations=n_citations,
-            id=escape_id(scraping.arxiv_pub_id(paper.url)),
+            n_citations=n_citations, id=escape_id(scraping.arxiv_pub_id(paper.url))
         )
+
     return paper
 
 
-async def stream_all_papers(limit, buffer_size=30):
+async def stream_all_papers(limit, citations, buffer_size=30):
     count = 0
     tasks = []
     for stream in subscriptions:
@@ -43,7 +47,7 @@ async def stream_all_papers(limit, buffer_size=30):
             if count == limit:
                 return
 
-            tasks.append(asyncio.create_task(postprocess_paper(paper)))
+            tasks.append(asyncio.create_task(postprocess_paper(paper, citations)))
             count += 1
 
 
@@ -61,8 +65,8 @@ def write_papers(papers, output):
         writer.writerows(papers)
 
 
-async def main(output, order_by, limit):
-    papers = [paper async for paper in stream_all_papers(limit)]
+async def main(output, order_by, limit, citations):
+    papers = [paper async for paper in stream_all_papers(limit, citations)]
     papers.sort(**parse_order_by(order_by))
     write_papers(papers, output)
 
@@ -85,6 +89,12 @@ if __name__ == "__main__":
         required=False,
         default=None,
         help="limit of the number of papers scraped, for debugging",
+    )
+    parser.add_argument(
+        "--no_citations",
+        dest="citations",
+        action="store_false",
+        help="don't include citation counts",
     )
     kwargs = vars(parser.parse_args())
     asyncio.run(main(**kwargs))
