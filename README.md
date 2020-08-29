@@ -1,6 +1,6 @@
 # lab-scraper
 
-Tool for scraping the websites of research labs for publications.
+Tool for scraping publications of research labs.
 
 ## Quickstart
 
@@ -10,6 +10,6 @@ Run: `lab_scraper.py output.csv`. `lab_scraper.py --help` for more options.
 
 ## Configuration
 
-For now we only support scraping [DeepMind](https://www.deepmind.com/research) papers. By default we scrap just those in the "Reinforcement learning" category on their website, but this can be changed by overriding the `lab_scraper.streams` variable.
+We support scraping [Arxiv](https://arxiv.org), as well the [DeepMind](https://www.deepmind.com/research) website. Paper streams can be customized via the `lab_scraper.subscriptions` variable.
 
-We plan on supporting more labs in the future. It's easy to add more by subclassing `lab_scraper.PaperStream`. Contributions welcome!
+We plan on supporting more labs in the future. It's easy to add more by subclassing `streams.PaperStream`. Contributions welcome!
