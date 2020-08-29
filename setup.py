@@ -13,5 +13,6 @@ setup(
         "pytest",
         "pytest-asyncio",
         "selenium",
+        "textract",
     ],
 )

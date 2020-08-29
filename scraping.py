@@ -1,8 +1,11 @@
 import asyncio
+from concurrent import futures
+import tempfile
 
 import aiohttp
 import bs4
 from selenium import webdriver
+from textract.parsers import pdf_parser
 
 
 async def fetch_static_page(url):
@@ -11,6 +14,14 @@ async def fetch_static_page(url):
             resp.status, url
         )
         return await resp.text()
+
+
+async def fetch_file(url):
+    async with aiohttp.request("GET", url) as resp:
+        assert resp.status == 200, "Status {} when fetching {}.".format(
+            resp.status, url
+        )
+        return await resp.read()
 
 
 async def fetch_dynamic_page(url, load_time=3):
@@ -32,6 +43,13 @@ def arxiv_abs_url(url):
         if url.endswith(".pdf"):
             url = url[: -len(".pdf")]
         url = url.replace("pdf", "abs")
+    return url
+
+
+def arxiv_pdf_url(url):
+    if "pdf" not in url:
+        assert "abs" in url, url
+        url = url.replace("abs", "pdf") + ".pdf"
     return url
 
 
@@ -69,3 +87,18 @@ async def arxiv_fetch_citations(abs_url):
         return semanticscholar_parse_citations(citation_text)
     else:
         return None
+
+
+pool = futures.ProcessPoolExecutor()
+
+
+def parse_pdf(pdf):
+    with tempfile.NamedTemporaryFile(suffix=".pdf") as f:
+        f.write(pdf)
+        return pdf_parser.Parser().extract_pdftotext(f.name, layout=True)
+
+
+async def arxiv_fetch_content(abs_url):
+    pdf_url = arxiv_pdf_url(abs_url)
+    pdf = await fetch_file(pdf_url)
+    return await asyncio.wrap_future(pool.submit(parse_pdf, pdf))

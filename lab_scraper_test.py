@@ -54,7 +54,6 @@ async def test_writes_papers_with_citations(tmp_path):
         subscriptions=[TestStream()],
         output=output_path,
         order_by="-year",
-        limit=None,
         citations=True,
     )
 
@@ -73,9 +72,26 @@ async def test_writes_papers_without_citations(tmp_path):
         subscriptions=[TestStream()],
         output=output_path,
         order_by="-year",
-        limit=None,
         citations=False,
     )
 
-    assert os.path.exists(output_path)
     assert read_papers(output_path) == test_papers
+
+
+@pytest.mark.asyncio
+async def test_writes_papers_with_content(tmp_path):
+    output_path = os.path.join(tmp_path, "out.csv")
+    content_path = os.path.join(tmp_path, "content")
+    await lab_scraper.main(
+        subscriptions=[TestStream()], output=output_path, content=content_path,
+    )
+
+    assert os.path.exists(content_path)
+    papers = read_papers(output_path)
+    paper_ids = set(paper.id for paper in papers)
+    content_filenames = set(os.listdir(content_path))
+    assert content_filenames == paper_ids
+
+    for filename in content_filenames:
+        path = os.path.join(content_path, filename)
+        assert os.path.getsize(path) > 0
