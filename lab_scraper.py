@@ -2,18 +2,10 @@ import argparse
 import asyncio
 import csv
 
+import config
 import data
 import scraping
 import streams
-
-
-subscriptions = [
-    # streams.DeepMind(category="Reinforcement learning"),
-    streams.Arxiv(
-        categories=["cs.ai", "cs.lg", "cs.sy", "stat.ml"],
-        abstract_contains=["reinforcement"],
-    )
-]
 
 
 def escape_id(id):
@@ -34,21 +26,29 @@ async def postprocess_paper(paper, citations):
     return paper
 
 
-async def stream_all_papers(limit, citations, buffer_size=30):
+async def stream_all_papers(subscriptions, limit, citations, buffer_size=30):
     count = 0
     tasks = []
+    stop = False
     for stream in subscriptions:
         async for paper in stream():
-            if count == limit or len(tasks) == buffer_size:
+            tasks.append(asyncio.create_task(postprocess_paper(paper, citations)))
+            count += 1
+
+            if len(tasks) == buffer_size:
                 for task in tasks:
                     yield await task
                 tasks.clear()
 
             if count == limit:
-                return
+                stop = True
+                break
 
-            tasks.append(asyncio.create_task(postprocess_paper(paper, citations)))
-            count += 1
+        if stop:
+            break
+
+    for task in tasks:
+        yield await task
 
 
 def parse_order_by(order_by):
@@ -65,8 +65,10 @@ def write_papers(papers, output):
         writer.writerows(papers)
 
 
-async def main(output, order_by, limit, citations):
-    papers = [paper async for paper in stream_all_papers(limit, citations)]
+async def main(subscriptions, output, order_by, limit, citations):
+    papers = [
+        paper async for paper in stream_all_papers(subscriptions, limit, citations)
+    ]
     papers.sort(**parse_order_by(order_by))
     write_papers(papers, output)
 
@@ -97,4 +99,4 @@ if __name__ == "__main__":
         help="don't include citation counts",
     )
     kwargs = vars(parser.parse_args())
-    asyncio.run(main(**kwargs))
+    asyncio.run(main(config.subscriptions, **kwargs))
