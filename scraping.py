@@ -106,5 +106,5 @@ async def arxiv_fetch_content(abs_url):
     try:
         return await asyncio.wrap_future(pool.submit(parse_pdf, pdf))
     except textract.exceptions.ShellError as e:
-        warnings.warn(f'Could not parse PDF {pdf_url}: {e}')
+        warnings.warn(f"Could not parse PDF {pdf_url}: {e}")
         return None

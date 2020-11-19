@@ -83,7 +83,9 @@ async def test_writes_papers_with_content(tmp_path):
     output_path = os.path.join(tmp_path, "out.csv")
     content_path = os.path.join(tmp_path, "content")
     await lab_scraper.main(
-        subscriptions=[TestStream()], output=output_path, content=content_path,
+        subscriptions=[TestStream()],
+        output=output_path,
+        content=content_path,
     )
 
     assert os.path.exists(content_path)

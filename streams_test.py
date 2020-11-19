@@ -7,7 +7,8 @@ import streams
     "stream",
     [
         streams.Arxiv(
-            categories=["cs.ai", "stat.ml"], abstract_contains=["reinforcement"],
+            categories=["cs.ai", "stat.ml"],
+            abstract_contains=["reinforcement"],
         ),
         streams.DeepMind(category="Reinforcement learning"),
     ],
