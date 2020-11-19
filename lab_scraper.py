@@ -13,7 +13,7 @@ def escape_id(id):
     return id.replace("/", "_")
 
 
-async def postprocess_paper(paper, citations, content_path):
+async def postprocess_paper(paper, citations, content_path, sleep):
     if paper.url is not None and scraping.is_arxiv_url(paper.url):
         if citations:
             n_citations = await scraping.arxiv_fetch_citations(paper.url)
@@ -32,11 +32,13 @@ async def postprocess_paper(paper, citations, content_path):
                     with open(paper_path, "wb") as f:
                         f.write(content)
 
+        await asyncio.sleep(sleep)
+
     return paper
 
 
 async def stream_all_papers(
-    subscriptions, limit, citations, content_path, buffer_size=30
+    subscriptions, limit, citations, content_path, sleep, buffer_size=30
 ):
     count = 0
     tasks = []
@@ -44,7 +46,9 @@ async def stream_all_papers(
     for stream in subscriptions:
         async for paper in stream():
             tasks.append(
-                asyncio.create_task(postprocess_paper(paper, citations, content_path))
+                asyncio.create_task(
+                    postprocess_paper(paper, citations, content_path, sleep)
+                )
             )
             count += 1
 
@@ -85,13 +89,19 @@ async def main(
     limit=None,
     citations=True,
     content=None,
+    sleep=None,
 ):
+    if sleep is None:
+        sleep = 0.5
+
     if content:
         os.makedirs(content, exist_ok=True)
 
     papers = [
         paper
-        async for paper in stream_all_papers(subscriptions, limit, citations, content)
+        async for paper in stream_all_papers(
+            subscriptions, limit, citations, content, sleep
+        )
     ]
     papers.sort(**parse_order_by(order_by))
     write_papers(papers, output)
@@ -127,6 +137,13 @@ if __name__ == "__main__":
         required=False,
         default=None,
         help="path to save the paper contents in",
+    )
+    parser.add_argument(
+        "--sleep",
+        type=float,
+        required=False,
+        default=None,
+        help="time in seconds to wait between paper requests",
     )
     kwargs = vars(parser.parse_args())
     asyncio.run(main(config.subscriptions, **kwargs))
