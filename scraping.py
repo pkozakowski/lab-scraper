@@ -1,10 +1,12 @@
 import asyncio
 from concurrent import futures
 import tempfile
+import warnings
 
 import aiohttp
 import bs4
 from selenium import webdriver
+import textract
 from textract.parsers import pdf_parser
 
 
@@ -101,4 +103,8 @@ def parse_pdf(pdf):
 async def arxiv_fetch_content(abs_url):
     pdf_url = arxiv_pdf_url(abs_url)
     pdf = await fetch_file(pdf_url)
-    return await asyncio.wrap_future(pool.submit(parse_pdf, pdf))
+    try:
+        return await asyncio.wrap_future(pool.submit(parse_pdf, pdf))
+    except textract.exceptions.ShellError as e:
+        warnings.warn(f'Could not parse PDF {pdf_url}: {e}')
+        return None
