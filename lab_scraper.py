@@ -25,10 +25,12 @@ async def postprocess_paper(paper, citations, content_path):
         )
 
         if content_path is not None:
-            content = await scraping.arxiv_fetch_content(paper.url)
-            if content is not None:
-                with open(os.path.join(content_path, paper.id), "wb") as f:
-                    f.write(content)
+            paper_path = os.path.join(content_path, paper.id)
+            if not os.path.exists(paper_path):
+                content = await scraping.arxiv_fetch_content(paper.url)
+                if content is not None:
+                    with open(paper_path, "wb") as f:
+                        f.write(content)
 
     return paper
 
